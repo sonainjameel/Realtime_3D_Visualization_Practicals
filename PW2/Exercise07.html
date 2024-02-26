@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Exercise 7 - VR experimentation</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden; /* Ensures the canvas fills the entire viewport */
+    }
+
+    #c {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+
+    import * as THREE from 'three';
+
+    import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+    import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
+    import { Reflector } from 'three/addons/objects/Reflector.js';
+    import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+    import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
+    import { InteractiveGroup } from 'three/addons/interactive/InteractiveGroup.js';
+    import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+
+    import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+    import Stats from 'three/addons/libs/stats.module.js';
+    import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js';
+    import { RectAreaLightHelper } from 'three/addons/helpers/RectAreaLightHelper.js';
+
+    class ColorGUIHelper {
+      constructor(object, prop) {
+        this.object = object;
+        this.prop = prop;
+      }
+      get value() {
+        return `#${this.object[this.prop].getHexString()}`;
+      }
+      set value(hexString) {
+        this.object[this.prop].set(hexString);
+      }
+    }
+    class DegRadHelper {
+        constructor(obj, prop) {
+            this.obj = obj;
+            this.prop = prop;
+        }
+        get value() {
+            return THREE.MathUtils.radToDeg(this.obj[this.prop]);
+        }
+        set value(v) {
+            this.obj[this.prop] = THREE.MathUtils.degToRad(v);
+        }
+    }
+
+    function makeXYZGUI(gui, vector3, name, onChangeFn) {
+    const folder = gui.addFolder(name);
+    folder.add(vector3, 'x', -10, 10).onChange(onChangeFn);
+    folder.add(vector3, 'y', 0, 10).onChange(onChangeFn);
+    folder.add(vector3, 'z', -10, 10).onChange(onChangeFn);
+    folder.open();
+  }
+
+    let camera, scene, renderer;
+    let reflector;
+    let stats, statsMesh;
+
+    
+    init();
+    animate();
+
+    function init() {
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 100 );
+ 
+  
+      camera.position.set(0, 3, 10);
+  
+
+      scene.background = new THREE.Color(0x000000);
+  
+      // Ambient Light
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); // Default white color, intensity 1
+      scene.add(ambientLight);
+  
+      // Hemisphere Light
+      const skyColor = 0xffffff; 
+      const groundColor = 0xffffff; 
+      const hemisphereLightIntensity = 0.5;
+      const hemisphereLight = new THREE.HemisphereLight(skyColor, groundColor, hemisphereLightIntensity);
+      scene.add(hemisphereLight);
+
+      const k=1;
+      const zk=-7;
+
+      // Directional Light
+      const directionalLight = new THREE.DirectionalLight(0xFFFFFF, 5);
+      directionalLight.position.set(0, 5*k, 0+zk);
+      directionalLight.target.position.set(0, 0, 0+zk);
+      scene.add(directionalLight);
+      scene.add(directionalLight.target);
+
+      const pointLight = new THREE.PointLight(0xFFFFFF, 5, 100);
+      pointLight.position.set(0, 4.8*k, 0+zk);
+      scene.add(pointLight);
+      const pointLightHelper = new THREE.PointLightHelper(pointLight);
+      //scene.add(pointLightHelper);
+
+      // Spot Light
+      const spotLight = new THREE.SpotLight(0xFFFFFF, 5);
+      spotLight.position.set(0, 5*k, 0+zk);
+      spotLight.angle = THREE.MathUtils.degToRad(10);
+      spotLight.penumbra = 0.1;
+      spotLight.distance = 5;
+      spotLight.target.position.set(0, 0, 0+zk);
+      scene.add(spotLight);
+      scene.add(spotLight.target);
+      const spotLightHelper = new THREE.SpotLightHelper(spotLight);
+      const rightWallLight = new THREE.RectAreaLight(0x00ff00, 5, 4.6*k, 4.5*k); 
+      rightWallLight.position.set(2.4*k, 2*k, 0+zk); 
+      rightWallLight.rotation.y = THREE.MathUtils.degToRad(90); 
+      scene.add(rightWallLight);
+      const rectLightHelper1 = new RectAreaLightHelper(rightWallLight);
+      rightWallLight.add( rectLightHelper1 );
+
+      const leftWallLight = new THREE.RectAreaLight(0xff0000, 5, 4.6*k, 4.5*k);
+      leftWallLight.position.set(-2.4*k, 2*k, 0+zk);
+      leftWallLight.rotation.y = THREE.MathUtils.degToRad(-90);
+      scene.add(leftWallLight);
+
+      const rectLightHelper2 = new RectAreaLightHelper(leftWallLight);
+      leftWallLight.add( rectLightHelper2 );
+
+      const backWallLight = new THREE.RectAreaLight(0xffffff, 5, 4.6*k, 4.5*k); 
+      backWallLight.position.set(0, 2*k, -2.4*k+zk); 
+      backWallLight.rotation.y = THREE.MathUtils.degToRad(180); 
+      scene.add(backWallLight);
+      const rectLightHelper3 = new RectAreaLightHelper(backWallLight);
+      backWallLight.add( rectLightHelper3 );
+      
+      const wallMaterial = new THREE.MeshPhysicalMaterial({side: THREE.DoubleSide});
+    const backWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 4.5*k), wallMaterial.clone());
+    backWall.position.set(0, 2*k, -2.5*k+zk);
+    backWall.material.color.setHex(0xffffff); // white
+    scene.add(backWall);
+    
+    const frame1= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,5.3*k,0.3*k), wallMaterial.clone());
+    frame1.position.set(-2.5*k,2.4*k,-2.5*k+zk);
+    frame1.rotation.y = Math.PI / 2;
+    frame1.material.color.setHex(0xaaaaaa);
+    scene.add(frame1);
+    
+    const frame2= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,5.3*k,0.3*k), wallMaterial.clone());
+    frame2.position.set(2.5*k,2.4*k,-2.5*k+zk);
+    frame2.rotation.y = -Math.PI / 2;
+    frame2.material.color.setHex(0xaaaaaa);
+    scene.add(frame2);
+    
+    const frame3= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,5.3*k,0.3*k), wallMaterial.clone());
+    frame3.position.set(-2.5*k,2.4*k,2.5*k+zk);
+    frame3.rotation.y = Math.PI / 2;
+    frame3.material.color.setHex(0xaaaaaa);
+    scene.add(frame3);
+    
+    const frame4= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,5.3*k,0.3*k), wallMaterial.clone());
+    frame4.position.set(2.5*k,2.4*k,2.5*k+zk);
+    frame4.rotation.y = -Math.PI / 2;
+    frame4.material.color.setHex(0xaaaaaa);
+    scene.add(frame4);
+    
+    const frame5= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,0.3*k,5.3*k), wallMaterial.clone());
+    frame5.position.set(0,5*k,-2.5*k+zk);
+    frame5.rotation.y = -Math.PI / 2;
+    frame5.material.color.setHex(0xaaaaaa);
+    scene.add(frame5);
+    
+    const frame6= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,0.2*k,5.3*k), wallMaterial.clone());
+    frame6.position.set(0,4.3*k,-2.5*k+zk);
+    frame6.rotation.y = -Math.PI / 2;
+    frame6.material.color.setHex(0xaaaaaa);
+    scene.add(frame6);
+    
+    const backframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 0.5*k), wallMaterial.clone());
+    backframeWall.position.set(0, 4.6*k, -2.5*k+zk);
+    backframeWall.material.color.setHex(0xa4dc2e); 
+    scene.add(backframeWall);
+    
+    const frame7= new THREE.Mesh(new THREE.BoxGeometry(5.3*k,0.3*k,0.3*k), wallMaterial.clone());
+    frame7.position.set(-2.5*k,5*k,0+zk);
+    frame7.rotation.y = -Math.PI / 2;
+    frame7.material.color.setHex(0xaaaaaa);
+    scene.add(frame7);
+    
+    const frame8= new THREE.Mesh(new THREE.BoxGeometry(5.3*k,0.2*k,0.3*k), wallMaterial.clone());
+    frame8.position.set(-2.5*k,4.3*k,0+zk);
+    frame8.rotation.y = -Math.PI / 2;
+    frame8.material.color.setHex(0xaaaaaa);
+    scene.add(frame8);
+    
+    const leftframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 0.5*k), wallMaterial.clone());
+    leftframeWall.position.set(-2.5*k, 4.6*k, 0+zk);
+    leftframeWall.rotation.y = Math.PI / 2;
+    leftframeWall.material.color.setHex(0xa4dc2e); 
+    scene.add(leftframeWall);
+    
+    const frame9= new THREE.Mesh(new THREE.BoxGeometry(5.3*k,0.3*k,0.3*k), wallMaterial.clone());
+    frame9.position.set(2.5*k,5*k,0+zk);
+    frame9.rotation.y = -Math.PI / 2;
+    frame9.material.color.setHex(0xaaaaaa);
+    scene.add(frame9);
+    
+    const frame10= new THREE.Mesh(new THREE.BoxGeometry(5.3*k,0.2*k,0.3*k), wallMaterial.clone());
+    frame10.position.set(2.5*k,4.3*k,0+zk);
+    frame10.rotation.y = -Math.PI / 2;
+    frame10.material.color.setHex(0xaaaaaa);
+    scene.add(frame10);
+    
+    const rightframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 0.5*k), wallMaterial.clone());
+    rightframeWall.position.set(2.5*k, 4.6*k, 0+zk);
+    rightframeWall.rotation.y = -Math.PI / 2;
+    rightframeWall.material.color.setHex(0xa4dc2e); 
+    scene.add(rightframeWall);
+    
+    const frame11= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,0.3*k,5.3*k), wallMaterial.clone());
+    frame11.position.set(0,5*k,2.5*k+zk);
+    frame11.rotation.y = -Math.PI / 2;
+    frame11.material.color.setHex(0xaaaaaa);
+    scene.add(frame11);
+    
+    const frame12= new THREE.Mesh(new THREE.BoxGeometry(0.3*k,0.2*k,5.3*k), wallMaterial.clone());
+    frame12.position.set(0,4.3*k,2.5*k+zk);
+    frame12.rotation.y = -Math.PI / 2;
+    frame12.material.color.setHex(0xaaaaaa);
+    scene.add(frame12);
+    
+    const frontframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 0.5*k), wallMaterial.clone());
+    frontframeWall.position.set(0, 4.6*k, 2.5*k+zk);
+    frontframeWall.material.color.setHex(0xa4dc2e); 
+    scene.add(frontframeWall);
+    
+    const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 4.5*k), wallMaterial.clone());
+    leftWall.position.set(-2.5*k, 2*k, 0+zk);
+    leftWall.rotation.y = Math.PI / 2;
+    leftWall.material.color.setHex(0xff0000); // red
+    scene.add(leftWall);
+    
+    const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 4.5*k), wallMaterial.clone());
+    rightWall.position.set(2.5*k, 2*k, 0+zk);
+    rightWall.rotation.y = -Math.PI / 2;
+    rightWall.material.color.setHex(0x00ff00); // green
+    scene.add(rightWall);
+    
+    const topWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 5*k), wallMaterial.clone());
+    topWall.position.set(0, 5*k, 0+zk);
+    topWall.rotation.x = -Math.PI / 2;
+    topWall.material.color.setHex(0xffffff); // white
+    scene.add(topWall);
+    
+    const bottomWall = new THREE.Mesh(new THREE.PlaneGeometry(5*k, 5*k), wallMaterial.clone());
+    bottomWall.position.set(0, -0.25*k, 0+zk);
+    bottomWall.rotation.x = Math.PI / 2;
+    bottomWall.material.color.setHex(0xffffff); // white
+    scene.add(bottomWall);
+    
+    const tableGeometry = new THREE.BoxGeometry(3*k, 0.1*k, 2*k);
+    const tableMaterial = new THREE.MeshLambertMaterial({ color: 0xffaa00 });
+    const table = new THREE.Mesh(tableGeometry, tableMaterial);
+    table.position.set(0, 0.75*k, 0+zk);
+    scene.add(table);
+    
+    const tablelegGeometry = new THREE.BoxGeometry(0.1*k, 1*k, 0.1*k);
+    const tableleg1 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+    tableleg1.position.set(-1.3*k, 0.26*k, 0.8*k+zk);
+    scene.add(tableleg1);
+    
+    const tableleg2 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+    tableleg2.position.set(-1.3*k, 0.26*k, -0.8*k+zk);
+    scene.add(tableleg2);
+    
+    const tableleg3 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+    tableleg3.position.set(1.3*k, 0.26*k, 0.8*k+zk);
+    scene.add(tableleg3);
+    
+    const tableleg4 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+    tableleg4.position.set(1.3*k, 0.26*k, -0.8*k+zk);
+    scene.add(tableleg4);
+    
+    const coneGeometry = new THREE.ConeGeometry(0.3*k, 1*k, 32);
+    const coneMaterial = new THREE.MeshLambertMaterial({color: 0xE05194});
+    const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+    cone.position.set(-0.3*k, 1.25*k, 0+zk);
+    scene.add(cone);
+    
+    const cylinderGeometry = new THREE.CylinderGeometry(0.3*k, 0.3*k, 1*k, 32);
+    const cylinderMaterial = new THREE.MeshPhongMaterial({color: 0x00FFFF});
+    const cylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+    cylinder.position.set(0.3*k, 1.25*k, 0+zk);
+    scene.add(cylinder);
+    
+    const sphereGeometry = new THREE.SphereGeometry(0.25*k, 32, 32);
+    const sphereMaterial = new THREE.MeshPhysicalMaterial({color: 0xffffff});
+    const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+    sphere.position.set(0, 1.05*k, 0.5*k+zk);
+    scene.add(sphere);
+
+
+        reflector = new Reflector( new THREE.PlaneGeometry( 2, 2 ), {
+            textureWidth: window.innerWidth * window.devicePixelRatio,
+            textureHeight: window.innerHeight * window.devicePixelRatio
+        } );
+        reflector.position.x = 1;
+        reflector.position.y = 1.5;
+        reflector.position.z = - 3;
+        reflector.rotation.y = - Math.PI / 4;
+        const frameGeometry = new THREE.BoxGeometry( 2.1, 2.1, 0.1 );
+				const frameMaterial = new THREE.MeshPhongMaterial();
+				const frame = new THREE.Mesh( frameGeometry, frameMaterial );
+				frame.position.z = - 0.07;
+				reflector.add( frame );
+
+
+        renderer = new THREE.WebGLRenderer( { antialias: true } );
+        renderer.autoClear = false;
+        renderer.setPixelRatio( window.devicePixelRatio );
+        renderer.setSize( window.innerWidth, window.innerHeight );
+        renderer.xr.enabled = true;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1;
+        document.body.appendChild( renderer.domElement );
+
+        document.body.appendChild( VRButton.createButton( renderer ) );
+
+        window.addEventListener( 'resize', onWindowResize );
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setFromPoints( [ new THREE.Vector3( 0, 0, 0 ), new THREE.Vector3( 0, 0, - 1 ) ] );
+
+        const controller1 = renderer.xr.getController( 0 );
+        controller1.add( new THREE.Line( geometry ) );
+        scene.add( controller1 );
+
+        const controller2 = renderer.xr.getController( 1 );
+        controller2.add( new THREE.Line( geometry ) );
+        scene.add( controller2 );
+
+        //
+
+        const controllerModelFactory = new XRControllerModelFactory();
+
+        const controllerGrip1 = renderer.xr.getControllerGrip( 0 );
+        controllerGrip1.add( controllerModelFactory.createControllerModel( controllerGrip1 ) );
+        scene.add( controllerGrip1 );
+
+        const controllerGrip2 = renderer.xr.getControllerGrip( 1 );
+        controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
+        scene.add( controllerGrip2 );
+
+
+        const gui = new GUI();
+  
+  // Hemisphere Light GUI
+  const hemisphereLightFolder = gui.addFolder('Hemisphere Light');
+  hemisphereLightFolder.addColor(new ColorGUIHelper(hemisphereLight, 'color'), 'value').name('Sky Color');
+  hemisphereLightFolder.addColor(new ColorGUIHelper(hemisphereLight, 'groundColor'), 'value').name('Ground Color');
+  hemisphereLightFolder.add(hemisphereLight, 'intensity', 0, 100, 0.01).name('Intensity');
+  hemisphereLightFolder.open();
+
+  // Directional Light GUI
+  const directionalLightFolder = gui.addFolder('Directional Light');
+  directionalLightFolder.addColor(new ColorGUIHelper(directionalLight, 'color'), 'value').name('Color');
+  directionalLightFolder.add(directionalLight, 'intensity', 0, 100, 0.01).name('Intensity');
+  directionalLightFolder.add(directionalLight.target.position, 'x', -10, 10, 0.01).name('Target X');
+  directionalLightFolder.add(directionalLight.target.position, 'y', 0, 10, 0.01).name('Target Y');
+  directionalLightFolder.add(directionalLight.target.position, 'z', -10, 10, 0.01).name('Target Z');
+  directionalLightFolder.open();
+
+  // Point Light GUI
+  const pointLightFolder = gui.addFolder('Point Light');
+  pointLightFolder.addColor(new ColorGUIHelper(pointLight, 'color'), 'value').name('Color');
+  pointLightFolder.add(pointLight, 'intensity', 0, 100, 0.01).name('Intensity');
+  pointLightFolder.add(pointLight, 'distance', 0, 100).onChange(() => pointLightHelper.update());
+  makeXYZGUI(pointLightFolder, pointLight.position, 'Position', () => pointLightHelper.update());
+  pointLightFolder.open();
+
+  // Spot Light GUI
+  const spotLightFolder = gui.addFolder('Spot Light');
+  spotLightFolder.addColor(new ColorGUIHelper(spotLight, 'color'), 'value').name('Color');
+  spotLightFolder.add(spotLight, 'intensity', 0, 100, 0.01).name('Intensity');
+  spotLightFolder.add(spotLight, 'distance', 0, 200).onChange(updateSpotLight);
+  spotLightFolder.add(new DegRadHelper(spotLight, 'angle'), 'value', 0, 90).name('Angle').onChange(updateSpotLight);
+  spotLightFolder.add(spotLight, 'penumbra', 0, 1, 0.01).name('Penumbra');
+  makeXYZGUI(spotLightFolder, spotLight.position, 'Position', updateSpotLight);
+  makeXYZGUI(spotLightFolder, spotLight.target.position, 'Target', updateSpotLight);
+  spotLightFolder.open();
+  function updateSpotLight() {
+  spotLight.target.updateMatrixWorld();
+  spotLightHelper.update();
+}
+const rightWallLightFolder = gui.addFolder('Right Wall Light');
+rightWallLightFolder.addColor(new ColorGUIHelper(rightWallLight, 'color'), 'value').name('Color');
+rightWallLightFolder.add(rightWallLight, 'intensity', 0, 100, 0.01).name('Intensity');
+rightWallLightFolder.add(rightWallLight, 'width', 0, 20).name('Width');
+rightWallLightFolder.add(rightWallLight, 'height', 0, 20).name('Height');
+makeXYZGUI(rightWallLightFolder, rightWallLight.position, 'Position');
+rightWallLightFolder.open();
+
+const leftWallLightFolder = gui.addFolder('Left Wall Light');
+leftWallLightFolder.addColor(new ColorGUIHelper(leftWallLight, 'color'), 'value').name('Color');
+leftWallLightFolder.add(leftWallLight, 'intensity', 0, 100, 0.01).name('Intensity');
+leftWallLightFolder.add(leftWallLight, 'width', 0, 20).name('Width');
+leftWallLightFolder.add(leftWallLight, 'height', 0, 20).name('Height');
+makeXYZGUI(leftWallLightFolder, leftWallLight.position, 'Position');
+leftWallLightFolder.open();
+
+const backWallLightFolder = gui.addFolder('Back Wall Light');
+backWallLightFolder.addColor(new ColorGUIHelper(backWallLight, 'color'), 'value').name('Color');
+backWallLightFolder.add(backWallLight, 'intensity', 0, 100, 0.01).name('Intensity');
+backWallLightFolder.add(backWallLight, 'width', 0, 20).name('Width');
+backWallLightFolder.add(leftWallLight, 'height', 0, 20).name('Height');
+makeXYZGUI(backWallLightFolder, backWallLight.position, 'Position');
+backWallLightFolder.open();
+        gui.domElement.style.visibility = 'hidden';
+
+        const group = new InteractiveGroup( renderer, camera );
+        scene.add( group );
+
+        const mesh = new HTMLMesh( gui.domElement );
+        mesh.position.x = - 0.5;
+        mesh.position.y = 1.5;
+        mesh.position.z = - 0.5;
+        mesh.rotation.y = Math.PI / 4;
+        mesh.scale.setScalar( 1 );
+        group.add( mesh );
+
+
+        // Add stats.js
+        stats = new Stats();
+        stats.dom.style.width = '80px';
+        stats.dom.style.height = '48px';
+        document.body.appendChild( stats.dom );
+
+        statsMesh = new HTMLMesh( stats.dom );
+        statsMesh.position.x = - 0.75;
+        statsMesh.position.y = 2;
+        statsMesh.position.z = - 0.6;
+        statsMesh.rotation.y = Math.PI / 4;
+        statsMesh.scale.setScalar( 3 );
+        group.add( statsMesh );
+
+    }
+
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize( window.innerWidth, window.innerHeight );
+
+    }
+
+    function animate() {
+
+        renderer.setAnimationLoop( render );
+
+    }
+
+    function render() {
+
+        const time = performance.now() * 0.0002;
+
+        renderer.render( scene, camera );
+        stats.update();
+        statsMesh.material.map.update();
+
+    }
+
+</script>
+</body>
+</html>

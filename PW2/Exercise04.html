@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Exercise 4 - Material properties</title>
+  <style>
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+      overflow: hidden; /* Ensures the canvas fills the entire viewport */
+    }
+
+    #c {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+
+  <script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import GUI from 'https://cdn.jsdelivr.net/npm/lil-gui@0.19/+esm';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+    function main() {
+      const canvas = document.querySelector('#c');
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        antialias: true
+      });
+ 
+    
+
+      const fov = 75;
+      const aspect = window.innerWidth / window.innerHeight;
+      const near = 0.1;
+      const far = 100;
+      const camera = new THREE.PerspectiveCamera(fov, aspect, near, far);
+      camera.position.set(0, 3, 10);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+
+      const pmremGenerator = new THREE.PMREMGenerator( renderer );
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color( 0x444444 );
+      scene.environment = pmremGenerator.fromScene( new RoomEnvironment(), 0.04 ).texture;
+      const constants = {
+
+combine: {
+
+    'THREE.MultiplyOperation': THREE.MultiplyOperation,
+    'THREE.MixOperation': THREE.MixOperation,
+    'THREE.AddOperation': THREE.AddOperation
+
+},
+
+side: {
+
+    'THREE.FrontSide': THREE.FrontSide,
+    'THREE.BackSide': THREE.BackSide,
+    'THREE.DoubleSide': THREE.DoubleSide
+
+},
+
+blendingMode: {
+
+    'THREE.NoBlending': THREE.NoBlending,
+    'THREE.NormalBlending': THREE.NormalBlending,
+    'THREE.AdditiveBlending': THREE.AdditiveBlending,
+    'THREE.SubtractiveBlending': THREE.SubtractiveBlending,
+    'THREE.MultiplyBlending': THREE.MultiplyBlending,
+    'THREE.CustomBlending': THREE.CustomBlending
+
+},
+
+equations: {
+
+    'THREE.AddEquation': THREE.AddEquation,
+    'THREE.SubtractEquation': THREE.SubtractEquation,
+    'THREE.ReverseSubtractEquation': THREE.ReverseSubtractEquation
+
+},
+
+destinationFactors: {
+
+    'THREE.ZeroFactor': THREE.ZeroFactor,
+    'THREE.OneFactor': THREE.OneFactor,
+    'THREE.SrcColorFactor': THREE.SrcColorFactor,
+    'THREE.OneMinusSrcColorFactor': THREE.OneMinusSrcColorFactor,
+    'THREE.SrcAlphaFactor': THREE.SrcAlphaFactor,
+    'THREE.OneMinusSrcAlphaFactor': THREE.OneMinusSrcAlphaFactor,
+    'THREE.DstAlphaFactor': THREE.DstAlphaFactor,
+    'THREE.OneMinusDstAlphaFactor': THREE.OneMinusDstAlphaFactor
+
+},
+
+sourceFactors: {
+
+    'THREE.DstColorFactor': THREE.DstColorFactor,
+    'THREE.OneMinusDstColorFactor': THREE.OneMinusDstColorFactor,
+    'THREE.SrcAlphaSaturateFactor': THREE.SrcAlphaSaturateFactor
+
+}
+
+};
+
+function getObjectsKeys( obj ) {
+
+const keys = [];
+
+for ( const key in obj ) {
+
+    if ( obj.hasOwnProperty( key ) ) {
+
+        keys.push( key );
+
+    }
+
+}
+
+return keys;
+
+}
+
+const textureLoader = new THREE.TextureLoader();
+const cubeTextureLoader = new THREE.CubeTextureLoader();
+
+const envMaps = ( function () {
+
+const path = './';
+const format = '.jpg';
+const urls = [
+    path + 'px' + format, path + 'nx' + format,
+    path + 'py' + format, path + 'ny' + format,
+    path + 'pz' + format, path + 'nz' + format
+];
+
+const reflectionCube = cubeTextureLoader.load( urls );
+
+const refractionCube = cubeTextureLoader.load( urls );
+refractionCube.mapping = THREE.CubeRefractionMapping;
+
+return {
+    none: null,
+    reflection: reflectionCube,
+    refraction: refractionCube
+};
+
+} )();
+
+const diffuseMaps = ( function () {
+
+const bricks = textureLoader.load( 'brick_diffuse.jpg' );
+bricks.wrapS = THREE.RepeatWrapping;
+bricks.wrapT = THREE.RepeatWrapping;
+bricks.repeat.set( 9, 1 );
+
+return {
+    none: null,
+    bricks: bricks
+};
+
+} )();
+
+const roughnessMaps = ( function () {
+
+const bricks = textureLoader.load( 'brick_roughness.jpg' );
+bricks.wrapT = THREE.RepeatWrapping;
+bricks.wrapS = THREE.RepeatWrapping;
+bricks.repeat.set( 9, 1 );
+
+return {
+    none: null,
+    bricks: bricks
+};
+
+} )();
+
+const matcaps = ( function () {
+
+return {
+    none: null,
+    porcelainWhite: textureLoader.load( 'matcap-porcelain-white.jpg' )
+};
+
+} )();
+
+const alphaMaps = ( function () {
+
+const fibers = textureLoader.load( 'alphaMap.jpg' );
+fibers.wrapT = THREE.RepeatWrapping;
+fibers.wrapS = THREE.RepeatWrapping;
+fibers.repeat.set( 9, 1 );
+
+return {
+    none: null,
+    fibers: fibers
+};
+
+} )();
+
+const gradientMaps = ( function () {
+
+const threeTone = textureLoader.load( 'threeTone.jpg' );
+threeTone.minFilter = THREE.NearestFilter;
+threeTone.magFilter = THREE.NearestFilter;
+
+const fiveTone = textureLoader.load( 'fiveTone.jpg' );
+fiveTone.minFilter = THREE.NearestFilter;
+fiveTone.magFilter = THREE.NearestFilter;
+
+return {
+    none: null,
+    threeTone: threeTone,
+    fiveTone: fiveTone
+};
+
+} )();
+
+const envMapKeys = getObjectsKeys( envMaps );
+const envMapKeysPBR = envMapKeys.slice( 0, 2 );
+const diffuseMapKeys = getObjectsKeys( diffuseMaps );
+const roughnessMapKeys = getObjectsKeys( roughnessMaps );
+const matcapKeys = getObjectsKeys( matcaps );
+const alphaMapKeys = getObjectsKeys( alphaMaps );
+const gradientMapKeys = getObjectsKeys( gradientMaps );
+
+function generateVertexColors( geometry ) {
+
+const positionAttribute = geometry.attributes.position;
+
+const colors = [];
+const color = new THREE.Color();
+
+for ( let i = 0, il = positionAttribute.count; i < il; i ++ ) {
+
+    color.setHSL( i / il * Math.random(), 0.5, 0.5 );
+    colors.push( color.r, color.g, color.b );
+
+}
+
+geometry.setAttribute( 'color', new THREE.Float32BufferAttribute( colors, 3 ) );
+
+}
+
+function handleColorChange( color ) {
+
+return function ( value ) {
+
+    if ( typeof value === 'string' ) {
+
+        value = value.replace( '#', '0x' );
+
+    }
+
+    color.setHex( value );
+
+};
+
+}
+
+function needsUpdate( material, geometry ) {
+
+return function () {
+
+    material.side = parseInt( material.side ); //Ensure number
+    material.needsUpdate = true;
+    geometry.attributes.position.needsUpdate = true;
+    geometry.attributes.normal.needsUpdate = true;
+    geometry.attributes.color.needsUpdate = true;
+
+};
+
+}
+
+function updateCombine( material ) {
+
+return function ( combine ) {
+
+    material.combine = parseInt( combine );
+    material.needsUpdate = true;
+
+};
+
+}
+
+function updateTexture( material, materialKey, textures ) {
+
+return function ( key ) {
+
+    material[ materialKey ] = textures[ key ];
+    material.needsUpdate = true;
+
+};
+
+}
+
+function guiScene( gui, scene ) {
+
+const folder = gui.addFolder( 'Scene' );
+
+const data = {
+    background: '#000000',
+    'ambient light': ambientLight.color.getHex()
+};
+
+folder.addColor( data, 'ambient light' ).onChange( handleColorChange( ambientLight.color ) );
+
+guiSceneFog( folder, scene );
+
+}
+
+function guiSceneFog( folder, scene ) {
+
+const fogFolder = folder.addFolder( 'scene.fog' );
+
+const fog = new THREE.Fog( 0x3f7b9d, 0, 60 );
+
+const data = {
+    fog: {
+        'THREE.Fog()': false,
+        'scene.fog.color': fog.color.getHex()
+    }
+};
+
+fogFolder.add( data.fog, 'THREE.Fog()' ).onChange( function ( useFog ) {
+
+    if ( useFog ) {
+
+        scene.fog = fog;
+
+    } else {
+
+        scene.fog = null;
+
+    }
+
+} );
+
+fogFolder.addColor( data.fog, 'scene.fog.color' ).onChange( handleColorChange( fog.color ) );
+
+}
+
+function guiSharedMaterialProperties(gui, meshes, materials, geometries) {
+  const folder = gui.addFolder('Shared Material Properties');
+
+  const sharedProperties = {
+    transparent: materials[0].transparent,
+    opacity: materials[0].opacity,
+    depthTest: materials[0].depthTest,
+    depthWrite: materials[0].depthWrite,
+    alphaTest: materials[0].alphaTest,
+    alphaHash: materials[0].alphaHash,
+    visible: materials[0].visible,
+    side: materials[0].side
+  };
+
+  const updateMaterials = (prop, value) => {
+    materials.forEach((material, index) => {
+      material[prop] = value;
+      needsUpdate(material, geometries[index]);
+    });
+  };
+
+  folder.add(sharedProperties, 'alphaTest', 0, 1).step(0.01).onChange(value => updateMaterials('alphaTest', value));
+  folder.add(sharedProperties, 'transparent').onChange(value => updateMaterials('transparent', value));
+  folder.add(sharedProperties, 'opacity', 0, 1).step(0.01).onChange(value => updateMaterials('opacity', value));
+  folder.add(sharedProperties, 'depthTest').onChange(value => updateMaterials('depthTest', value));
+  folder.add(sharedProperties, 'depthWrite').onChange(value => updateMaterials('depthWrite', value));
+  folder.add(sharedProperties, 'alphaHash').onChange(value => updateMaterials('alphaHash', value));
+  folder.add(sharedProperties, 'visible').onChange(value => updateMaterials('visible', value));
+  folder.add(sharedProperties, 'side', constants.side).onChange(value => updateMaterials('side', value));
+}
+
+
+function guiMeshLambertMaterial( gui, mesh, material, geometry ) {
+
+const data = {
+    color: material.color.getHex(),
+    emissive: material.emissive.getHex(),
+    envMaps: envMapKeys[ 0 ],
+    map: diffuseMapKeys[ 0 ],
+    alphaMap: alphaMapKeys[ 0 ]
+};
+
+const folder = gui.addFolder( 'THREE.MeshLambertMaterial' );
+
+folder.addColor( data, 'color' ).onChange( handleColorChange( material.color ) );
+folder.addColor( data, 'emissive' ).onChange( handleColorChange( material.emissive ) );
+
+folder.add( material, 'wireframe' );
+folder.add( material, 'vertexColors' ).onChange( needsUpdate( material, geometry ) );
+folder.add( material, 'fog' ).onChange( needsUpdate( material, geometry ) );
+
+folder.add( data, 'envMaps', envMapKeys ).onChange( updateTexture( material, 'envMap', envMaps ) );
+folder.add( data, 'map', diffuseMapKeys ).onChange( updateTexture( material, 'map', diffuseMaps ) );
+folder.add( data, 'alphaMap', alphaMapKeys ).onChange( updateTexture( material, 'alphaMap', alphaMaps ) );
+folder.add( material, 'combine', constants.combine ).onChange( updateCombine( material ) );
+folder.add( material, 'reflectivity', 0, 1 );
+folder.add( material, 'refractionRatio', 0, 1 );
+
+}
+
+
+
+function guiMeshPhongMaterial( gui, mesh, material, geometry ) {
+
+const data = {
+    color: material.color.getHex(),
+    emissive: material.emissive.getHex(),
+    specular: material.specular.getHex(),
+    envMaps: envMapKeys[ 0 ],
+    map: diffuseMapKeys[ 0 ],
+    alphaMap: alphaMapKeys[ 0 ]
+};
+
+const folder = gui.addFolder( 'THREE.MeshPhongMaterial' );
+
+folder.addColor( data, 'color' ).onChange( handleColorChange( material.color ) );
+folder.addColor( data, 'emissive' ).onChange( handleColorChange( material.emissive ) );
+folder.addColor( data, 'specular' ).onChange( handleColorChange( material.specular ) );
+
+folder.add( material, 'shininess', 0, 100 );
+folder.add( material, 'flatShading' ).onChange( needsUpdate( material, geometry ) );
+folder.add( material, 'wireframe' );
+folder.add( material, 'vertexColors' ).onChange( needsUpdate( material, geometry ) );
+folder.add( material, 'fog' ).onChange( needsUpdate( material, geometry ) );
+folder.add( data, 'envMaps', envMapKeys ).onChange( updateTexture( material, 'envMap', envMaps ) );
+folder.add( data, 'map', diffuseMapKeys ).onChange( updateTexture( material, 'map', diffuseMaps ) );
+folder.add( data, 'alphaMap', alphaMapKeys ).onChange( updateTexture( material, 'alphaMap', alphaMaps ) );
+folder.add( material, 'combine', constants.combine ).onChange( updateCombine( material ) );
+folder.add( material, 'reflectivity', 0, 1 );
+folder.add( material, 'refractionRatio', 0, 1 );
+
+}
+
+
+function guiMeshPhysicalMaterial( gui, mesh, material, geometry ) {
+
+const data = {
+    color: material.color.getHex(),
+    emissive: material.emissive.getHex(),
+    envMaps: envMapKeys[ 0 ],
+    map: diffuseMapKeys[ 0 ],
+    roughnessMap: roughnessMapKeys[ 0 ],
+    alphaMap: alphaMapKeys[ 0 ],
+    metalnessMap: alphaMapKeys[ 0 ],
+    sheenColor: material.sheenColor.getHex(),
+    specularColor: material.specularColor.getHex(),
+    iridescenceMap: alphaMapKeys[ 0 ]
+};
+
+const folder = gui.addFolder( 'THREE.MeshPhysicalMaterial' );
+
+folder.addColor( data, 'color' ).onChange( handleColorChange( material.color ) );
+folder.addColor( data, 'emissive' ).onChange( handleColorChange( material.emissive ) );
+
+folder.add( material, 'roughness', 0, 1 );
+folder.add( material, 'metalness', 0, 1 );
+folder.add( material, 'ior', 1, 2.333 );
+folder.add( material, 'reflectivity', 0, 1 );
+folder.add( material, 'iridescence', 0, 1 );
+folder.add( material, 'iridescenceIOR', 1, 2.333 );
+folder.add( material, 'sheen', 0, 1 );
+folder.add( material, 'sheenRoughness', 0, 1 );
+folder.addColor( data, 'sheenColor' ).onChange( handleColorChange( material.sheenColor ) );
+folder.add( material, 'clearcoat', 0, 1 ).step( 0.01 );
+folder.add( material, 'clearcoatRoughness', 0, 1 ).step( 0.01 );
+folder.add( material, 'specularIntensity', 0, 1);
+folder.addColor( data, 'specularColor' ).onChange( handleColorChange( material.specularColor ) );
+folder.add( material, 'flatShading' ).onChange( needsUpdate( material, geometry ) );
+folder.add( material, 'wireframe' );
+folder.add( material, 'vertexColors' ).onChange( needsUpdate( material, geometry ) );
+folder.add( material, 'fog' ).onChange( needsUpdate( material, geometry ) );
+folder.add( data, 'envMaps', envMapKeysPBR ).onChange( updateTexture( material, 'envMap', envMaps ) );
+folder.add( data, 'map', diffuseMapKeys ).onChange( updateTexture( material, 'map', diffuseMaps ) );
+folder.add( data, 'roughnessMap', roughnessMapKeys ).onChange( updateTexture( material, 'roughnessMap', roughnessMaps ) );
+folder.add( data, 'alphaMap', alphaMapKeys ).onChange( updateTexture( material, 'alphaMap', alphaMaps ) );
+folder.add( data, 'metalnessMap', alphaMapKeys ).onChange( updateTexture( material, 'metalnessMap', alphaMaps ) );
+folder.add( data, 'iridescenceMap', alphaMapKeys ).onChange( updateTexture( material, 'iridescenceMap', alphaMaps ) );
+
+}
+  
+      const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+      scene.add(ambientLight);
+      const pointLight = new THREE.PointLight(0xffffff, 10, 0);
+      pointLight.position.set(0, 3, 0);
+      scene.add(pointLight);
+  
+      const wallMaterial = new THREE.MeshPhysicalMaterial({side: THREE.DoubleSide});
+
+const backWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 4.5), wallMaterial.clone());
+backWall.position.set(0, 2, -2.5);
+backWall.material.color.setHex(0xffffff); // white
+scene.add(backWall);
+
+const frame1= new THREE.Mesh(new THREE.BoxGeometry(0.3,5.3,0.3), wallMaterial.clone());
+frame1.position.set(-2.5,2.4,-2.5);
+frame1.rotation.y = Math.PI / 2;
+frame1.material.color.setHex(0xaaaaaa);
+scene.add(frame1);
+
+const frame2= new THREE.Mesh(new THREE.BoxGeometry(0.3,5.3,0.3), wallMaterial.clone());
+frame2.position.set(2.5,2.4,-2.5);
+frame2.rotation.y = -Math.PI / 2;
+frame2.material.color.setHex(0xaaaaaa);
+scene.add(frame2);
+
+
+const frame3= new THREE.Mesh(new THREE.BoxGeometry(0.3,5.3,0.3), wallMaterial.clone());
+frame3.position.set(-2.5,2.4,2.5);
+frame3.rotation.y = Math.PI / 2;
+frame3.material.color.setHex(0xaaaaaa);
+scene.add(frame3);
+
+const frame4= new THREE.Mesh(new THREE.BoxGeometry(0.3,5.3,0.3), wallMaterial.clone());
+frame4.position.set(2.5,2.4,2.5);
+frame4.rotation.y = -Math.PI / 2;
+frame4.material.color.setHex(0xaaaaaa);
+scene.add(frame4);
+
+const frame5= new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,5.3), wallMaterial.clone());
+frame5.position.set(0,5,-2.5);
+frame5.rotation.y = -Math.PI / 2;
+frame5.material.color.setHex(0xaaaaaa);
+scene.add(frame5);
+
+const frame6= new THREE.Mesh(new THREE.BoxGeometry(0.3,0.2,5.3), wallMaterial.clone());
+frame6.position.set(0,4.3,-2.5);
+frame6.rotation.y = -Math.PI / 2;
+frame6.material.color.setHex(0xaaaaaa);
+scene.add(frame6);
+const backframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.5), wallMaterial.clone());
+backframeWall.position.set(0, 4.6, -2.5);
+backframeWall.material.color.setHex(0xa4dc2e); 
+scene.add(backframeWall);
+
+
+const frame7= new THREE.Mesh(new THREE.BoxGeometry(5.3,0.3,0.3), wallMaterial.clone());
+frame7.position.set(-2.5,5,0);
+frame7.rotation.y = -Math.PI / 2;
+frame7.material.color.setHex(0xaaaaaa);
+scene.add(frame7);
+
+const frame8= new THREE.Mesh(new THREE.BoxGeometry(5.3,0.2,0.3), wallMaterial.clone());
+frame8.position.set(-2.5,4.3,0);
+frame8.rotation.y = -Math.PI / 2;
+frame8.material.color.setHex(0xaaaaaa);
+scene.add(frame8);
+const leftframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.5), wallMaterial.clone());
+leftframeWall.position.set(-2.5, 4.6, 0);
+leftframeWall.rotation.y = Math.PI / 2;
+leftframeWall.material.color.setHex(0xa4dc2e); 
+scene.add(leftframeWall);
+
+
+const frame9= new THREE.Mesh(new THREE.BoxGeometry(5.3,0.3,0.3), wallMaterial.clone());
+frame9.position.set(2.5,5,0);
+frame9.rotation.y = -Math.PI / 2;
+frame9.material.color.setHex(0xaaaaaa);
+scene.add(frame9);
+
+const frame10= new THREE.Mesh(new THREE.BoxGeometry(5.3,0.2,0.3), wallMaterial.clone());
+frame10.position.set(2.5,4.3,0);
+frame10.rotation.y = -Math.PI / 2;
+frame10.material.color.setHex(0xaaaaaa);
+scene.add(frame10);
+const rightframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.5), wallMaterial.clone());
+rightframeWall.position.set(2.5, 4.6, 0);
+rightframeWall.rotation.y = -Math.PI / 2;
+rightframeWall.material.color.setHex(0xa4dc2e); 
+scene.add(rightframeWall);
+
+const frame11= new THREE.Mesh(new THREE.BoxGeometry(0.3,0.3,5.3), wallMaterial.clone());
+frame11.position.set(0,5,2.5);
+frame11.rotation.y = -Math.PI / 2;
+frame11.material.color.setHex(0xaaaaaa);
+scene.add(frame11);
+
+const frame12= new THREE.Mesh(new THREE.BoxGeometry(0.3,0.2,5.3), wallMaterial.clone());
+frame12.position.set(0,4.3,2.5);
+frame12.rotation.y = -Math.PI / 2;
+frame12.material.color.setHex(0xaaaaaa);
+scene.add(frame12);
+const frontframeWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 0.5), wallMaterial.clone());
+frontframeWall.position.set(0, 4.6, 2.5);
+frontframeWall.material.color.setHex(0xa4dc2e); 
+scene.add(frontframeWall);
+
+const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 4.5), wallMaterial.clone());
+leftWall.position.set(-2.5, 2, 0);
+leftWall.rotation.y = Math.PI / 2;
+leftWall.material.color.setHex(0xff0000); // red
+scene.add(leftWall);
+
+const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 4.5), wallMaterial.clone());
+rightWall.position.set(2.5, 2, 0);
+rightWall.rotation.y = -Math.PI / 2;
+rightWall.material.color.setHex(0x00ff00); // green
+scene.add(rightWall);
+
+const topWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), wallMaterial.clone());
+topWall.position.set(0, 5, 0);
+topWall.rotation.x = -Math.PI / 2;
+topWall.material.color.setHex(0xffffff); // white
+scene.add(topWall);
+
+const bottomWall = new THREE.Mesh(new THREE.PlaneGeometry(5, 5), wallMaterial.clone());
+bottomWall.position.set(0, -0.25, 0);
+bottomWall.rotation.x = Math.PI / 2;
+bottomWall.material.color.setHex(0xffffff); // white
+scene.add(bottomWall);
+
+const tableGeometry = new THREE.BoxGeometry(3, 0.1, 2);
+const tableMaterial = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+const table = new THREE.Mesh(tableGeometry, tableMaterial);
+table.position.set(0, 0.75, 0);
+scene.add(table);
+
+const tablelegGeometry = new THREE.BoxGeometry(0.1, 1, 0.1);
+const tableleg1 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+tableleg1.position.set(-1.3, 0.25, 0.8);
+scene.add(tableleg1);
+
+const tableleg2 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+tableleg2.position.set(-1.3, 0.25, -0.8);
+scene.add(tableleg2);
+
+const tableleg3 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+tableleg3.position.set(1.3, 0.25, 0.8);
+scene.add(tableleg3);
+
+const tableleg4 = new THREE.Mesh(tablelegGeometry, tableMaterial);
+tableleg4.position.set(1.3, 0.25, -0.8);
+scene.add(tableleg4);
+
+
+
+
+const coneGeometry = new THREE.ConeGeometry(0.3, 1, 32);
+const coneMaterial = new THREE.MeshLambertMaterial({color: 0xE05194, side: THREE.DoubleSide});
+const cone = new THREE.Mesh(coneGeometry, coneMaterial);
+cone.position.set(-0.3, 1.25, 0);
+
+
+const cylinderGeometry = new THREE.CylinderGeometry(0.3, 0.3, 1, 32);
+const cylinderMaterial = new THREE.MeshPhongMaterial({color: 0x00FFFF, side: THREE.DoubleSide});
+const cylinder = new THREE.Mesh(cylinderGeometry, cylinderMaterial);
+cylinder.position.set(0.3, 1.25, 0);
+
+const sphereGeometry = new THREE.SphereGeometry(0.25, 32, 32);
+const sphereMaterial = new THREE.MeshPhysicalMaterial({color: 0xffffff, side: THREE.DoubleSide});
+const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+sphere.position.set(0, 1.05, 0.5);
+
+      const gui = new GUI();
+      guiScene( gui, scene );
+      generateVertexColors( coneGeometry );
+      guiSharedMaterialProperties(gui, [cone, cylinder, sphere], [coneMaterial, cylinderMaterial, sphereMaterial], [coneGeometry, cylinderGeometry, sphereGeometry]);
+
+      guiMeshLambertMaterial( gui, cone, coneMaterial, coneGeometry );
+      scene.add( cone );
+      generateVertexColors( cylinderGeometry );
+      guiMeshPhongMaterial( gui, cylinder, cylinderMaterial, cylinderGeometry );
+      scene.add( cylinder );
+      generateVertexColors( sphereGeometry );
+      guiMeshPhysicalMaterial( gui, sphere, sphereMaterial, sphereGeometry );
+      scene.add( sphere );
+      let prevFog = false;
+
+      function resizeRendererToDisplaySize(renderer) {
+        const canvas = renderer.domElement;
+        const width = canvas.clientWidth;
+        const height = canvas.clientHeight;
+        const needResize = canvas.width !== width || canvas.height !== height;
+        if (needResize) {
+          renderer.setSize(width, height, false);
+          camera.aspect = width / height;
+          camera.updateProjectionMatrix();
+        }
+        return needResize;
+      }
+
+      function render() {
+        if (resizeRendererToDisplaySize(renderer)) {
+          const canvas = renderer.domElement;
+          camera.aspect = canvas.clientWidth / canvas.clientHeight;
+          camera.updateProjectionMatrix();
+        }
+        
+        requestAnimationFrame( render );
+
+				
+
+				if ( prevFog !== scene.fog ) {
+
+					cone.material.needsUpdate = true;
+                    cylinder.material.needsUpdate = true;
+                    sphere.material.needsUpdate = true;
+					prevFog = scene.fog;
+
+				}
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      render();
+    }
+
+    main();
+  </script>
+</body>
+
+</html>

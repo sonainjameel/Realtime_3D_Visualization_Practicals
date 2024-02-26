@@ -1,0 +1,396 @@
+<!-- Licensed under a BSD license. See license.html for license -->
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Exercise 5 - VR and MR experimentation</title>
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        #c {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+</body>
+<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.159.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.159.0/examples/jsm/"
+    }
+  }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
+
+function main() {
+
+	const canvas = document.querySelector( '#c' );
+	const renderer = new THREE.WebGLRenderer( { antialias: true, canvas } );
+	renderer.xr.enabled = true;
+	document.body.appendChild( VRButton.createButton( renderer ) );
+
+	const fov = 75;
+	const aspect = 2; 
+	const near = 0.1;
+	const far = 1000;
+	const camera = new THREE.PerspectiveCamera( fov, aspect, near, far );
+	camera.position.set(20, 20, 20);
+    camera.lookAt(0, 0, 0);
+
+
+	const scene = new THREE.Scene();
+
+	{
+
+		const color = 0xFFFFFF;
+		const intensity = 3;
+		const light = new THREE.DirectionalLight( color, intensity );
+		light.position.set( - 1, 2, 4 );
+		scene.add( light );
+
+	}
+    function createCross(x, z, size, intensity) {
+        const crossVertices = [];
+        const halfSize = size / 2;
+    
+        // Vertical line
+        crossVertices.push(new THREE.Vector3(x, 0, z + halfSize));
+        crossVertices.push(new THREE.Vector3(x, 0, z - halfSize));
+    
+        // Horizontal line
+        crossVertices.push(new THREE.Vector3(x + halfSize, 0, z));
+        crossVertices.push(new THREE.Vector3(x - halfSize, 0, z));
+    
+        const crossGeometry = new THREE.BufferGeometry().setFromPoints(crossVertices);
+        const crossMaterial = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: intensity, transparent: true });
+    
+        const cross = new THREE.LineSegments(crossGeometry, crossMaterial);
+        return cross;
+    }
+    
+    function calculateIntensity(x, z, maxDistance) {
+        const distance = Math.sqrt(x * x + z * z);
+        const intensity = 1 - Math.min(distance / maxDistance, 1);
+        return intensity;
+    }
+    let stepSize = 0.5; // The distance covered in one step
+    let stepTime = 1; // Time duration of one step (in seconds)
+    let lastStepTime = 0; // Time when the last step was taken
+    let stepCounter = 0; // Initialize a counter for the steps
+    const maxDistance = 100; // Max distance for intensity calculation
+        const axesSize = 5; 
+        
+        scene.background = new THREE.Color( 0x444444 );
+        const objects = [];
+
+const ambientLight = new THREE.AmbientLight(0xffffff, 1); // Soft white light
+scene.add(ambientLight);
+
+const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+directionalLight.position.set(1, 1, 1);
+scene.add(directionalLight);
+
+const vertices = new Float32Array([
+    -0.75, -1,  1,  // 0: bottom left front
+     0.75, -1,  1,  // 1: bottom right front
+     1,  1,  1,  // 2: top right front
+    -1,  1,  1,  // 3: top left front
+    -0.75, -1, -1,  // 4: bottom left back
+     0.75, -1, -1,  // 5: bottom right back
+     1,  1, -1,  // 6: top right back
+    -1,  1, -1   // 7: top left back
+]);
+
+const indices = [
+    0, 1, 2,   0, 2, 3,  // front face
+    4, 6, 5,   4, 7, 6,  // back face
+    4, 5, 1,   4, 1, 0,  // bottom face
+    7, 3, 2,   7, 2, 6,  // top face
+    5, 6, 2,   5, 2, 1,  // right face
+    7, 4, 0,   7, 0, 3   // left face
+];
+
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+geometry.setIndex(indices);
+
+const material = new THREE.MeshPhysicalMaterial({
+        color: 0xFFA500, emissive: 0xffa500,metalness: 1,
+        roughness: 0.5,side: THREE.DoubleSide
+    });
+
+
+const body = new THREE.Mesh(geometry, material);
+
+const radiusTop = 0.1; 
+const radiusBottom = 0.2; 
+const height = 1.5; 
+const radialSegments = 32; 
+
+const cylinderGeometry1 = new THREE.CylinderGeometry(radiusTop, radiusBottom, height, radialSegments);
+const cylinderGeometry2 = new THREE.CylinderGeometry(radiusBottom, radiusTop, height, radialSegments);
+const cylinderGeometry3 = new THREE.CylinderGeometry(radiusTop, radiusBottom, 2, radialSegments);
+const cylinderGeometry4 = new THREE.CylinderGeometry(0.1, 0.1, 2, radialSegments);
+
+const cylinderGeometry5 = new THREE.CylinderGeometry(0.07, 0.07, 0.3, radialSegments);
+
+const material2 = new THREE.MeshPhysicalMaterial({ color: 0xFFA500, emissive: 0xffa500,metalness: 1,
+        roughness: 0.5,side: THREE.DoubleSide });
+const material3 = new THREE.MeshPhysicalMaterial({ color: 0xAAAAAA, emissive: 0xaaaaaa,metalness: 1,
+        roughness: 0.5,side: THREE.DoubleSide });
+const material4 = new THREE.MeshPhysicalMaterial({ color: 0x000000, emissive: 0x000000,metalness: 1,
+        roughness: 0.5,side: THREE.DoubleSide });
+
+const jointgeometry = new THREE.SphereGeometry( 0.25, 32, 16 ); 
+const jointgeometry2 = new THREE.SphereGeometry( 0.15, 32, 16 ); 
+
+const upperleg1 = new THREE.Mesh(cylinderGeometry1, material2);
+const jointupperleg1 = new THREE.Mesh(jointgeometry, material2);
+const upperleg2 = new THREE.Mesh(cylinderGeometry1, material2);
+const jointupperleg2 = new THREE.Mesh(jointgeometry, material2);
+const upperleg3 = new THREE.Mesh(cylinderGeometry1, material2);
+const jointupperleg3 = new THREE.Mesh(jointgeometry, material2);
+const upperleg4 = new THREE.Mesh(cylinderGeometry1, material2);
+const jointupperleg4 = new THREE.Mesh(jointgeometry, material2);
+
+const lowerleg1 = new THREE.Mesh(cylinderGeometry2, material4);
+
+const lowerleg2 = new THREE.Mesh(cylinderGeometry2, material4);
+const lowerleg3 = new THREE.Mesh(cylinderGeometry2, material4);
+const lowerleg4 = new THREE.Mesh(cylinderGeometry2, material4);
+
+
+const lowerneck = new THREE.Mesh(cylinderGeometry4, material4);
+const upperneck = new THREE.Mesh(cylinderGeometry4, material4);
+const jointneck1 = new THREE.Mesh(jointgeometry, material2);
+const jointneck2 = new THREE.Mesh(jointgeometry, material2);
+const jointneck3 = new THREE.Mesh(jointgeometry2, material2);
+const jointmouth1 = new THREE.Mesh(jointgeometry2, material2);
+const jointmouth2 = new THREE.Mesh(jointgeometry2, material2);
+
+const mouth1 = new THREE.Mesh(cylinderGeometry5, material3);
+const mouth2 = new THREE.Mesh(cylinderGeometry5, material3);
+const mouth3 = new THREE.Mesh(cylinderGeometry5, material3);
+const mouth4 = new THREE.Mesh(cylinderGeometry5, material3);
+
+const positions = geometry.getAttribute('position');
+
+for (let i = 0; i < positions.count; i++) {
+    positions.setX(i, positions.getX(i) * 2);     
+    positions.setY(i, positions.getY(i) * 0.5);   
+    positions.setZ(i, positions.getZ(i) * 0.75);  
+}
+
+
+positions.needsUpdate = true;
+body.position.set(0, 0, 0);
+
+jointupperleg1.position.set(0.96, -0.25, 0.75);
+upperleg1.position.set(0.5, -0.7, 0.75);
+upperleg1.rotation.z=40;
+
+jointupperleg2.position.set(0.96, -0.25, -0.75);
+upperleg2.position.set(0.5, -0.7, -0.75);
+upperleg2.rotation.z=40;
+
+jointupperleg3.position.set(-1.04, -0.25, 0.75);
+upperleg3.position.set(-1.5, -0.7, 0.75);
+upperleg3.rotation.z=40;
+
+jointupperleg4.position.set(-1.04, -0.25, -0.75);
+upperleg4.position.set(-1.5, -0.7, -0.75);
+upperleg4.rotation.z=40;
+
+
+lowerleg1.position.set(0.5, -1.6, 0.75);
+lowerleg1.rotation.z=-40;
+
+lowerleg2.position.set(0.5, -1.6, -0.75);
+lowerleg2.rotation.z=-40;
+
+lowerleg3.position.set(-1.5, -1.6, 0.75);
+lowerleg3.rotation.z=-40;
+
+lowerleg4.position.set(-1.5, -1.6, -0.75);
+lowerleg4.rotation.z=-40;
+
+jointneck1.position.set(1.5,0.5,0);
+lowerneck.rotation.z=Math.PI/2;
+lowerneck.position.set(0.7, 0.75, 0);
+jointneck2.position.set(-0.3,0.9,0);
+
+mouth1.rotation.z=Math.PI/3;
+mouth1.position.set(1.9, 0.94, 0);
+jointmouth1.position.set(2.05,1.3,0);
+mouth2.rotation.z=-Math.PI/3;
+mouth2.position.set(1.9, 1.2, 0);
+jointmouth2.position.set(2.05,0.9,0);
+
+
+mouth3.rotation.z=-Math.PI/3;
+mouth3.position.set(2.2, 0.9, 0);
+mouth4.rotation.z=Math.PI/3;
+mouth4.position.set(2.2, 1.2, 0);
+
+const mouthgroup = new THREE.Group();
+
+mouthgroup.add(mouth1);
+mouthgroup.add(jointmouth1);
+mouthgroup.add(mouth2);
+mouthgroup.add(jointmouth2);
+mouthgroup.add(mouth3);
+mouthgroup.add(mouth4);
+
+body.position.set(0, 2.2, 0);
+scene.add(body);
+
+body.add(jointupperleg1);
+upperleg1.position.set(-0.55, -0.55, 0);
+jointupperleg1.add(upperleg1);
+lowerleg1.position.set(-0.55, -1.45, 0);
+jointupperleg1.add(lowerleg1);
+body.add(jointupperleg2);
+upperleg2.position.set(-0.55, -0.55, 0);
+jointupperleg2.add(upperleg2);
+lowerleg2.position.set(-0.55, -1.45, 0);
+jointupperleg2.add(lowerleg2);
+
+body.add(jointupperleg3);
+upperleg3.position.set(-0.55, -0.55, 0);
+jointupperleg3.add(upperleg3);
+lowerleg3.position.set(-0.55, -1.45, 0);
+jointupperleg3.add(lowerleg3);
+body.add(jointupperleg4);
+upperleg4.position.set(-0.55, -0.55, 0);
+jointupperleg4.add(upperleg4);
+lowerleg4.position.set(-0.55, -1.45, 0);
+jointupperleg4.add(lowerleg4);
+
+body.add(jointneck1);
+lowerneck.position.set(-1,0.2,0);
+jointneck1.add(lowerneck);
+jointneck2.position.set(0.15,1,0);
+lowerneck.add(jointneck2);
+upperneck.position.set(0.1, -1, 0);
+jointneck2.add(upperneck);
+jointneck3.position.set(0,-1.05,0);
+upperneck.add(jointneck3);
+mouthgroup.position.set(-1.8,-1.1,0);
+jointneck3.add(mouthgroup);
+jointneck3.rotation.z=-Math.PI/2;
+
+body.position.set(0,2.2,-10);
+function animateLegs(time) {
+    let legSwingSpeed = Math.PI / stepTime; 
+    let legSwingAmplitude = Math.PI / 5;
+
+    if (stepCounter < 15) {
+        if (time - lastStepTime > stepTime) {
+            body.position.x += stepSize; 
+            
+
+            let swingValue = Math.sin(time * legSwingSpeed) * legSwingAmplitude;
+            jointupperleg1.rotation.z = swingValue;
+            jointupperleg2.rotation.z = -swingValue;
+            jointupperleg3.rotation.z = swingValue;
+            jointupperleg4.rotation.z = -swingValue;
+            stepCounter++;
+            lastStepTime = time;
+        }
+    }
+    
+    function animateNeck(time) {
+    if (stepCounter >= 15 && stepCounter<50) {
+        jointupperleg1.rotation.z = 0;
+        jointupperleg2.rotation.z = 0;
+        jointupperleg3.rotation.z = 0;
+        jointupperleg4.rotation.z = 0;
+      
+        jointneck1.rotation.z = -0.01*time*Math.PI;
+        stepCounter++;
+    }
+    function animateNeck2(time){
+        if (stepCounter >= 50 && stepCounter<100) {
+        jointneck2.rotation.z = 0.01*time*Math.PI;
+        stepCounter++;
+    }
+    function animateNeck3(time){
+        if (stepCounter >= 100 && stepCounter<150) {
+        jointneck3.rotation.x = Math.sin(time*Math.PI/2);
+        stepCounter++;
+    }
+    }
+    animateNeck3(time);
+    }
+    animateNeck2(time);
+}
+animateNeck(time);
+}
+
+
+
+
+
+
+	
+    
+      
+
+
+
+	function resizeRendererToDisplaySize( renderer ) {
+
+		const canvas = renderer.domElement;
+		const width = canvas.clientWidth;
+		const height = canvas.clientHeight;
+		const needResize = canvas.width !== width || canvas.height !== height;
+		if ( needResize ) {
+
+			renderer.setSize( width, height, false );
+
+		}
+
+		return needResize;
+
+	}
+
+	function render( time ) {
+
+		time *= 0.001;
+
+		if ( resizeRendererToDisplaySize( renderer ) ) {
+
+			const canvas = renderer.domElement;
+			camera.aspect = canvas.clientWidth / canvas.clientHeight;
+			camera.updateProjectionMatrix();
+
+		}
+        animateLegs(time);
+
+		renderer.render( scene, camera );
+
+	}
+
+	renderer.setAnimationLoop( render );
+
+}
+
+main();
+</script>
+</html>
